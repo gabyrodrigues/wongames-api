@@ -76,6 +76,49 @@ async function createManyToManyData(products) {
   ]);
 }
 
+async function createGames(products) {
+  await Promise.all(
+    products.map(async (product) => {
+      const item = await getByName(product.title, gameService);
+
+      if (!item) {
+        console.info(`Creating: ${product.title}...`);
+
+        const game = await strapi.service(`${gameService}`).create({
+          data: {
+            name: product.title,
+            slug: product.slug,
+            price: product.price.finalMoney.amount,
+            release_date: new Date(product.releaseDate),
+            categories: await Promise.all(
+              product.genres.map(({ name }) => getByName(name, categoryService))
+            ),
+            platforms: await Promise.all(
+              product.operatingSystems.map((name) =>
+                getByName(name, platformService)
+              )
+            ),
+            developers: await Promise.all(
+              product.developers.map((name) =>
+                getByName(name, developerService)
+              )
+            ),
+            publisher: await Promise.all(
+              product.publishers.map((name) =>
+                getByName(name, publisherService)
+              )
+            ),
+            ...(await getGameInfo(product.slug)),
+            publishedAt: new Date(),
+          },
+        });
+
+        return game;
+      }
+    })
+  );
+}
+
 async function getByName(name, entityService) {
   const item = await strapi.service(entityService).find({
     filters: { name },
@@ -106,5 +149,7 @@ export default factories.createCoreService("api::game.game", () => ({
     } = await axios.get(gogApiUrl);
 
     await createManyToManyData([products[0], products[1]]);
+
+    await createGames([products[0], products[1]]);
   },
 }));
